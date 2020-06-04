@@ -1,0 +1,16 @@
+apiVersion : apps/v1beta1
+kind: Deployment
+metadata:
+  name: "kuvkubtst2"
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: "kuvkubtst2"
+    spec:
+      containers:
+        - name: "kuvkubtst2"
+          image: "abhisheaacr.azurecr.io/kuvkubtst2"
+          ports:
+          - containerPort: 80
