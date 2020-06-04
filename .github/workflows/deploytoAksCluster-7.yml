@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: abhisheaacr.azurecr.io
+        username: ${{ secrets.acr_abhisheaacr_username }}
+        password: ${{ secrets.acr_abhisheaacr_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/app dir/WindowsMvcApp" -f  "app dir/WindowsMvcApp/Dockerfile" -t abhisheaacr.azurecr.io/kuvkubtst2:${{ github.sha }}
+        docker push abhisheaacr.azurecr.io/kuvkubtst2:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_kuvkubtst2_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep kuvkubtst2321f | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace kuvkubtst2321f`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: kuvkubtst2321f
+        container-registry-url: abhisheaacr.azurecr.io
+        container-registry-username: ${{ secrets.acr_abhisheaacr_username }}
+        container-registry-password: ${{ secrets.acr_abhisheaacr_password }}
+        secret-name: kuvkubtst2dockerauth
+       
+    - uses: azure/k8s-deploy@v1
+      with:
+        namespace: kuvkubtst2321f
+        manifests: |
+          manifests/deployment-7.yml
+          manifests/service-7.yml
+        images: |
+          abhisheaacr.azurecr.io/kuvkubtst2:${{ github.sha }}
+        imagepullsecrets: |
+          kuvkubtst2dockerauth
