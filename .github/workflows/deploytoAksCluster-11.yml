@@ -1,0 +1,51 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: acr2ac5ef2vrjdac.azurecr.io
+        username: ${{ secrets.acr_acr2ac5ef2vrjdac_username }}
+        password: ${{ secrets.acr_acr2ac5ef2vrjdac_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/app dir/WindowsMvcApp" -f  "app dir/WindowsMvcApp/Dockerfile" -t acr2ac5ef2vrjdac.azurecr.io/anchauhtestaks:${{ github.sha }}
+        docker push acr2ac5ef2vrjdac.azurecr.io/anchauhtestaks:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_anchauhtestaks_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep anchauhtestaks5df2 | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace anchauhtestaks5df2`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: anchauhtestaks5df2
+        container-registry-url: acr2ac5ef2vrjdac.azurecr.io
+        container-registry-username: ${{ secrets.acr_acr2ac5ef2vrjdac_username }}
+        container-registry-password: ${{ secrets.acr_acr2ac5ef2vrjdac_password }}
+        secret-name: anchauhtestadockerauth
+       
+    - uses: azure/k8s-deploy@v1
+      with:
+        namespace: anchauhtestaks5df2
+        manifests: |
+          manifests/deployment-11.yml
+          manifests/service-11.yml
+          manifests/ingress-2.yml
+        images: |
+          acr2ac5ef2vrjdac.azurecr.io/anchauhtestaks:${{ github.sha }}
+        imagepullsecrets: |
+          anchauhtestadockerauth
