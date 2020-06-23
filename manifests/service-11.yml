@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+    name: "anchauhtestaks-577f"
+    labels:
+        app: "anchauhtestaks-577f"
+spec:
+    type: ClusterIP
+    ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+    selector:
+        app: "anchauhtestaks-577f"
