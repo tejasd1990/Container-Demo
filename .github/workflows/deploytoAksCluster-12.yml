@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: tddncaks1acr.azurecr.io
+        username: ${{ secrets.acr_tddncaks1acr_username }}
+        password: ${{ secrets.acr_tddncaks1acr_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/app dir/WindowsMvcApp" -f  "app dir/WindowsMvcApp/Dockerfile" -t tddncaks1acr.azurecr.io/tddncaks1:${{ github.sha }} --label dockerfile-path=app dir/WindowsMvcApp/Dockerfile
+        docker push tddncaks1acr.azurecr.io/tddncaks1:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_tddncaks1_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep td-dnc-aks199ae | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace td-dnc-aks199ae`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: td-dnc-aks199ae
+        container-registry-url: tddncaks1acr.azurecr.io
+        container-registry-username: ${{ secrets.acr_tddncaks1acr_username }}
+        container-registry-password: ${{ secrets.acr_tddncaks1acr_password }}
+        secret-name: tddncaks1dockerauth
+       
+    - uses: azure/k8s-deploy@v1.2
+      with:
+        namespace: td-dnc-aks199ae
+        manifests: |
+          manifests/deployment-12.yml
+          manifests/service-12.yml
+        images: |
+          tddncaks1acr.azurecr.io/tddncaks1:${{ github.sha }}
+        imagepullsecrets: |
+          tddncaks1dockerauth
